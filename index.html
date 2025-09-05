@@ -206,6 +206,11 @@
             stroke: rgba(255, 255, 255, 0.4);
             stroke-width: 1;
         }
+        
+        .circle-guide.inner {
+            stroke: rgba(74, 144, 226, 0.6);
+            stroke-width: 1.5;
+        }
 
         /* Animation */
         @keyframes fadeIn {
@@ -526,7 +531,7 @@
                 
                 // Draw guide circles
                 this.container.append("circle")
-                    .attr("class", "circle-guide")
+                    .attr("class", "circle-guide inner")
                     .attr("r", this.innerRadius)
                     .attr("cx", 0)
                     .attr("cy", 0);
