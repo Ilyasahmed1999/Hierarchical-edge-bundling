@@ -182,9 +182,9 @@
 
         /* Outer Layer Nodes */
         .outer-node {
-            fill: rgba(128, 128, 128, 0.6);
-            stroke: rgba(255, 255, 255, 0.4);
-            stroke-width: 1.5;
+            fill: rgba(255, 255, 255, 0.8);
+            stroke: rgba(255, 255, 255, 0.9);
+            stroke-width: 2;
         }
 
         .outer-node.highlighted {
@@ -203,13 +203,13 @@
         /* Circle Guides - matching the reference image */
         .circle-guide {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.4);
-            stroke-width: 1;
+            stroke: rgba(255, 255, 255, 0.7);
+            stroke-width: 1.5;
         }
         
         .circle-guide.inner {
-            stroke: rgba(74, 144, 226, 0.6);
-            stroke-width: 1.5;
+            stroke: rgba(74, 144, 226, 0.8);
+            stroke-width: 2.5;
         }
 
         /* Animation */
@@ -385,7 +385,7 @@
                 
                 // Radius definitions to match the reference
                 this.centerRadius = 80;
-                this.innerRadius = 160;
+                this.innerRadius = 120;
                 this.outerRadius = Math.min(this.width, this.height) * 0.38;
                 
                 this.currentView = "main";
