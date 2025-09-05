@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hierarchical Edge Bundling - Values Network</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            color: white;
+        }
+
+        .app-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: #000;
+        }
+
+        .header {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            z-index: 1000;
+        }
+
+        .history-btn {
+            background: rgba(128, 128, 128, 0.8);
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .history-btn:hover {
+            background: rgba(128, 128, 128, 1);
+        }
+
+        .breadcrumbs {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        .breadcrumb {
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .breadcrumb:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .breadcrumb.active {
+            color: #4a90e2;
+            font-weight: 600;
+        }
+
+        .separator {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .visualization-container {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Node Styles */
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover {
+            filter: brightness(1.2);
+        }
+
+        .node-text {
+            fill: white;
+            font-size: 11px;
+            font-weight: 400;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .center-text {
+            font-size: 16px;
+            font-weight: 600;
+            fill: white;
+        }
+
+        /* Connection Styles */
+        .connection-line {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.15);
+            stroke-width: 1;
+            opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+
+        .connection-line.highlighted {
+            stroke: #4a90e2;
+            stroke-width: 2;
+            opacity: 1;
+        }
+
+        /* Center Node */
+        .center-node {
+            filter: drop-shadow(0 0 10px rgba(74, 144, 226, 0.5));
+        }
+
+        .center-image {
+            opacity: 0.8;
+        }
+
+        .center-ring {
+            fill: none;
+            stroke: #4a90e2;
+            stroke-width: 3;
+            opacity: 0.8;
+        }
+
+        /* Inner Layer Nodes */
+        .inner-node {
+            fill: rgba(128, 128, 128, 0.8);
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 2;
+        }
+
+        .inner-node.highlighted {
+            fill: #4a90e2;
+            stroke: #4a90e2;
+            stroke-width: 2;
+            filter: drop-shadow(0 0 8px rgba(74, 144, 226, 0.6));
+        }
+
+        .inner-node.selected {
+            fill: white;
+            stroke: #4a90e2;
+            stroke-width: 3;
+        }
+
+        /* Outer Layer Nodes */
+        .outer-node {
+            fill: rgba(128, 128, 128, 0.6);
+            stroke: rgba(255, 255, 255, 0.4);
+            stroke-width: 1.5;
+        }
+
+        .outer-node.highlighted {
+            fill: white;
+            stroke: white;
+            stroke-width: 2;
+            filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+        }
+
+        .outer-node.selected {
+            fill: white;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        /* Circle Guides - matching the reference image */
+        .circle-guide {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 1;
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .info-panel.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .info-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4a90e2;
+        }
+
+        .info-description {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+
+        .info-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+
+        <nav class="breadcrumbs" id="breadcrumbs"></nav>
+
+        <div class="info-panel" id="infoPanel">
+            <div class="info-title" id="infoTitle">Explore the Network</div>
+            <div class="info-description" id="infoDescription">
+                Click on nodes to explore connections and relationships within the values network.
+            </div>
+            <div class="info-stats">
+                <div>
+                    <div class="stat-value" id="connectionCount">-</div>
+                    <div class="stat-label">Connections</div>
+                </div>
+                <div>
+                    <div class="stat-value" id="nodeLevel">-</div>
+                    <div class="stat-label">Level</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="visualization-container">
+            <svg id="visualization"></svg>
+        </div>
+    </div>
+
+    <script>
+        const data = {
+            center: { 
+                id: "values", 
+                name: "Values", 
+                description: "Core values that guide our decisions and shape our society",
+                level: "center"
+            },
+            inner: [
+                { id: "trust", name: "Trust as a Value", description: "Building and maintaining trust in institutions and relationships", level: "core" },
+                { id: "human_dignity", name: "Valuing Human Dignity", description: "Respecting the inherent worth of every individual", level: "core" },
+                { id: "digital_equity", name: "Valuing Digital Equity", description: "Ensuring fair access to digital resources and opportunities", level: "core" },
+                { id: "environment", name: "Valuing the Environment", description: "Protecting and preserving our natural world for future generations", level: "core" },
+                { id: "common_good", name: "The Common Good", description: "Working together for the benefit of all members of society", level: "core" }
+            ],
+            outer: [
+                // Trust connections
+                { id: "aging_longevity", name: "Ageing and Longevity", parent: "trust", level: "domain" },
+                { id: "systemic_racism", name: "Systemic Racism", parent: "trust", level: "domain" },
+                { id: "human_rights", name: "Human Rights", parent: "trust", level: "domain" },
+                { id: "legal_innovation", name: "Legal Innovation", parent: "trust", level: "domain" },
+                { id: "uk", name: "United Kingdom", parent: "trust", level: "domain" },
+                
+                // Human Dignity connections
+                { id: "gender_inequality", name: "Gender Inequality", parent: "human_dignity", level: "domain" },
+                { id: "us", name: "United States", parent: "human_dignity", level: "domain" },
+                { id: "justice_law", name: "Justice and Law", parent: "human_dignity", level: "domain" },
+                { id: "civic_participation", name: "Civic Participation", parent: "human_dignity", level: "domain" },
+                { id: "future_work", name: "Future of Work", parent: "human_dignity", level: "domain" },
+                
+                // Digital Equity connections
+                { id: "internet_timing", name: "Internet of Things", parent: "digital_equity", level: "domain" },
+                { id: "infrastructure", name: "Infrastructure", parent: "digital_equity", level: "domain" },
+                { id: "blockchain", name: "Blockchain", parent: "digital_equity", level: "domain" },
+                { id: "social_protection", name: "Social Protection", parent: "digital_equity", level: "domain" },
+                { id: "digital_communications", name: "Digital Communications", parent: "digital_equity", level: "domain" },
+                
+                // Environment connections
+                { id: "circular_economy", name: "Circular Economy", parent: "environment", level: "domain" },
+                { id: "future_environment", name: "Future of the Environment", parent: "environment", level: "domain" },
+                { id: "fresh_water", name: "Fresh Water", parent: "environment", level: "domain" },
+                { id: "food_security", name: "Food Security", parent: "environment", level: "domain" },
+                { id: "antarctica", name: "Antarctica", parent: "environment", level: "domain" },
+                
+                // Common Good connections
+                { id: "sustainable_dev", name: "Sustainable Development", parent: "common_good", level: "domain" },
+                { id: "social_justice", name: "Social Justice", parent: "common_good", level: "domain" },
+                { id: "economic_progress", name: "Economic Progress", parent: "common_good", level: "domain" },
+                { id: "taxes", name: "Taxes", parent: "common_good", level: "domain" },
+                { id: "corruption", name: "Corruption", parent: "common_good", level: "domain" },
+                { id: "corporate_governance", name: "Corporate Governance", parent: "common_good", level: "domain" },
+                { id: "leadership", name: "Leadership", parent: "common_good", level: "domain" },
+                { id: "social_innovation", name: "Social Innovation", parent: "common_good", level: "domain" },
+                { id: "financial_services", name: "Financial Services", parent: "common_good", level: "domain" },
+                { id: "behavioral_services", name: "Behavioral Services", parent: "common_good", level: "domain" },
+                { id: "financial_future", name: "Money Financial Future", parent: "common_good", level: "domain" },
+                { id: "asset_management", name: "Asset Management", parent: "common_good", level: "domain" },
+                { id: "banking_capital", name: "Banking Capital Markets", parent: "common_good", level: "domain" },
+                { id: "global_business", name: "Global Business", parent: "common_good", level: "domain" },
+                { id: "climate_finance", name: "Climate Finance", parent: "common_good", level: "domain" },
+                { id: "ocean", name: "Ocean", parent: "common_good", level: "domain" },
+                { id: "forests", name: "Forests", parent: "common_good", level: "domain" },
+                { id: "net_zero", name: "The Net Zero Transition", parent: "common_good", level: "domain" },
+                { id: "development_finance", name: "Development Finance", parent: "common_good", level: "domain" }
+            ]
+        };
+
+        class HierarchicalEdgeBundling {
+            constructor() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.centerX = this.width / 2;
+                this.centerY = this.height / 2;
+                
+                // Radius definitions to match the reference
+                this.centerRadius = 80;
+                this.innerRadius = 160;
+                this.outerRadius = Math.min(this.width, this.height) * 0.38;
+                
+                this.currentView = "main";
+                this.selectedNode = null;
+                this.breadcrumbs = ["Values"];
+                this.clickedNodeId = null; // Track which node was clicked for persistent highlighting
+                
+                this.svg = d3.select("#visualization")
+                    .attr("viewBox", `0 0 ${this.width} ${this.height}`);
+                
+                this.container = this.svg.append("g")
+                    .attr("transform", `translate(${this.centerX}, ${this.centerY})`);
+                
+                this.setupEventListeners();
+                this.render();
+            }
+            
+            setupEventListeners() {
+                d3.select("#historyBtn").on("click", () => this.resetView());
+                window.addEventListener("resize", () => this.handleResize());
+            }
+            
+            handleResize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.centerX = this.width / 2;
+                this.centerY = this.height / 2;
+                this.outerRadius = Math.min(this.width, this.height) * 0.38;
+                
+                this.svg.attr("viewBox", `0 0 ${this.width} ${this.height}`);
+                this.container.attr("transform", `translate(${this.centerX}, ${this.centerY})`);
+                this.render();
+            }
+            
+            updateBreadcrumbs() {
+                const breadcrumbsDiv = d3.select("#breadcrumbs");
+                breadcrumbsDiv.selectAll("*").remove();
+                
+                this.breadcrumbs.forEach((crumb, index) => {
+                    if (index > 0) {
+                        breadcrumbsDiv.append("span")
+                            .attr("class", "separator")
+                            .text("/");
+                    }
+                    
+                    breadcrumbsDiv.append("a")
+                        .attr("class", `breadcrumb ${index === this.breadcrumbs.length - 1 ? 'active' : ''}`)
+                        .text(crumb)
+                        .on("click", () => {
+                            if (index === 0) this.resetView();
+                        });
+                });
+            }
+            
+            updateInfoPanel(node) {
+                const panel = d3.select("#infoPanel");
+                
+                if (!node) {
+                    panel.classed("visible", false);
+                    return;
+                }
+                
+                const connections = node.level === "core" ? 
+                    data.outer.filter(n => n.parent === node.id).length : 
+                    (node.level === "center" ? data.inner.length : 1);
+                
+                d3.select("#infoTitle").text(node.name);
+                d3.select("#infoDescription").text(node.description || "No description available");
+                d3.select("#connectionCount").text(connections);
+                d3.select("#nodeLevel").text(node.level.toUpperCase());
+                
+                panel.classed("visible", true);
+            }
+            
+            render() {
+                this.container.selectAll("*").remove();
+                
+                if (this.currentView === "main") {
+                    this.renderMainView();
+                } else {
+                    this.renderExpandedView();
+                }
+                
+                this.updateBreadcrumbs();
+            }
+            
+            renderMainView() {
+                // Calculate positions matching the reference image layout
+                const innerNodes = data.inner.map((d, i) => {
+                    const angle = (i * 2 * Math.PI) / data.inner.length - Math.PI / 2;
+                    return {
+                        ...d,
+                        angle: angle,
+                        x: Math.cos(angle) * this.innerRadius,
+                        y: Math.sin(angle) * this.innerRadius
+                    };
+                });
+                
+                const outerNodes = data.outer.map(d => {
+                    const parent = innerNodes.find(p => p.id === d.parent);
+                    if (!parent) return null;
+                    
+                    const siblings = data.outer.filter(s => s.parent === d.parent);
+                    const siblingIndex = siblings.findIndex(s => s.id === d.id);
+                    const totalSiblings = siblings.length;
+                    
+                    // Spread siblings around their parent
+                    const spreadAngle = Math.PI / 2; // 90 degrees spread
+                    const startAngle = parent.angle - spreadAngle / 2;
+                    const angle = totalSiblings === 1 ? parent.angle : 
+                                 startAngle + (siblingIndex * spreadAngle) / (totalSiblings - 1);
+                    
+                    return {
+                        ...d,
+                        angle: angle,
+                        x: Math.cos(angle) * this.outerRadius,
+                        y: Math.sin(angle) * this.outerRadius
+                    };
+                }).filter(Boolean);
+                
+                // Draw guide circles
+                this.container.append("circle")
+                    .attr("class", "circle-guide")
+                    .attr("r", this.innerRadius)
+                    .attr("cx", 0)
+                    .attr("cy", 0);
+                
+                this.container.append("circle")
+                    .attr("class", "circle-guide")
+                    .attr("r", this.outerRadius)
+                    .attr("cx", 0)
+                    .attr("cy", 0);
+                
+                // Draw connections first (behind nodes)
+                const connectionsGroup = this.container.append("g").attr("class", "connections");
+                
+                outerNodes.forEach(outer => {
+                    const inner = innerNodes.find(n => n.id === outer.parent);
+                    if (inner) {
+                        connectionsGroup.append("line")
+                            .attr("class", "connection-line")
+                            .attr("x1", inner.x)
+                            .attr("y1", inner.y)
+                            .attr("x2", outer.x)
+                            .attr("y2", outer.y)
+                            .attr("data-inner", inner.id)
+                            .attr("data-outer", outer.id);
+                    }
+                });
+                
+                // Draw center node with image placeholder and blue ring
+                this.drawCenterNode();
+                
+                // Draw inner layer nodes
+                this.drawInnerNodes(innerNodes);
+                
+                // Draw outer layer nodes
+                this.drawOuterNodes(outerNodes);
+            }
+            
+            drawCenterNode() {
+                // Background circle for image
+                this.container.append("circle")
+                    .attr("class", "center-node center-image")
+                    .attr("r", this.centerRadius - 10)
+                    .attr("cx", 0)
+                    .attr("cy", 0)
+                    .attr("fill", "#333")
+                    .on("click", () => this.handleNodeClick(data.center))
+                    .on("mouseover", () => this.updateInfoPanel(data.center))
+                    .on("mouseout", () => this.clearSelection());
+                
+                // Blue ring around center
+                this.container.append("circle")
+                    .attr("class", "center-ring")
+                    .attr("r", this.centerRadius)
+                    .attr("cx", 0)
+                    .attr("cy", 0);
+                
+                // Center text
+                this.container.append("text")
+                    .attr("class", "node-text center-text")
+                    .attr("x", 0)
+                    .attr("y", 5)
+                    .attr("text-anchor", "middle")
+                    .text(data.center.name);
+            }
+            
+            drawInnerNodes(nodes) {
+                const innerGroup = this.container.append("g").attr("class", "inner-nodes");
+                
+                // Draw nodes
+                innerGroup.selectAll(".inner-node")
+                    .data(nodes)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "inner-node node fade-in")
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y)
+                    .attr("r", 20)
+                    .on("click", (event, d) => this.handleNodeClick(d))
+                    .on("mouseover", (event, d) => {
+                        if (this.clickedNodeId !== d.id) {
+                            this.highlightConnections(d.id, false); // false = hover highlight
+                        }
+                    })
+                    .on("mouseout", (event, d) => {
+                        // Only clear highlights if they're from hover, not from click
+                        if (this.clickedNodeId !== d.id) {
+                            this.clearHighlights();
+                        }
+                    });
+                
+                // Draw labels
+                innerGroup.selectAll(".inner-text")
+                    .data(nodes)
+                    .enter()
+                    .append("text")
+                    .attr("class", "node-text")
+                    .attr("x", d => d.x > 0 ? d.x + 30 : d.x - 30)
+                    .attr("y", d => d.y)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", d => d.x > 0 ? "start" : "end")
+                    .style("font-size", "12px")
+                    .each(function(d) {
+                        // Handle multi-line text
+                        const words = d.name.split(" ");
+                        const text = d3.select(this);
+                        text.selectAll("tspan").remove();
+                        
+                        words.forEach((word, i) => {
+                            text.append("tspan")
+                                .attr("x", text.attr("x"))
+                                .attr("dy", i === 0 ? 0 : "1.1em")
+                                .text(word);
+                        });
+                    });
+            }
+            
+            drawOuterNodes(nodes) {
+                const outerGroup = this.container.append("g").attr("class", "outer-nodes");
+                
+                // Draw nodes
+                outerGroup.selectAll(".outer-node")
+                    .data(nodes)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "outer-node node fade-in")
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y)
+                    .attr("r", 8)
+                    .on("click", (event, d) => this.expandNode(d))
+                    .on("mouseover", (event, d) => this.updateInfoPanel(d))
+                    .on("mouseout", () => this.clearSelection());
+                
+                // Draw labels
+                outerGroup.selectAll(".outer-text")
+                    .data(nodes)
+                    .enter()
+                    .append("text")
+                    .attr("class", "node-text")
+                    .attr("x", d => {
+                        const offset = d.x > 0 ? 15 : -15;
+                        return d.x + offset;
+                    })
+                    .attr("y", d => d.y)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", d => d.x > 0 ? "start" : "end")
+                    .style("font-size", "10px")
+                    .text(d => d.name);
+            }
+            
+            renderExpandedView() {
+                const selectedNode = data.outer.find(n => n.id === this.selectedNode);
+                if (!selectedNode) return;
+                
+                // Center the selected node
+                this.container.append("circle")
+                    .attr("class", "center-node")
+                    .attr("r", this.centerRadius)
+                    .attr("cx", 0)
+                    .attr("cy", 0)
+                    .attr("fill", "#4a90e2");
+                
+                this.container.append("text")
+                    .attr("class", "node-text center-text")
+                    .attr("x", 0)
+                    .attr("y", 5)
+                    .attr("text-anchor", "middle")
+                    .text(selectedNode.name);
+                
+                // Show related nodes
+                const related = data.outer.filter(n => n.parent === selectedNode.parent && n.id !== selectedNode.id);
+                
+                related.forEach((node, i) => {
+                    const angle = (i * 2 * Math.PI) / related.length;
+                    const x = Math.cos(angle) * 250;
+                    const y = Math.sin(angle) * 250;
+                    
+                    // Connection line
+                    this.container.append("line")
+                        .attr("class", "connection-line highlighted")
+                        .attr("x1", 0).attr("y1", 0)
+                        .attr("x2", x).attr("y2", y);
+                    
+                    // Node
+                    this.container.append("circle")
+                        .attr("class", "outer-node node")
+                        .attr("cx", x).attr("cy", y)
+                        .attr("r", 15)
+                        .on("click", () => this.expandNode(node))
+                        .on("mouseover", () => this.updateInfoPanel(node));
+                    
+                    // Label
+                    this.container.append("text")
+                        .attr("class", "node-text")
+                        .attr("x", x)
+                        .attr("y", y - 25)
+                        .attr("text-anchor", "middle")
+                        .style("font-size", "11px")
+                        .text(node.name);
+                });
+                
+                this.updateInfoPanel(selectedNode);
+            }
+            
+            handleNodeClick(node) {
+                this.selectedNode = node;
+                this.updateInfoPanel(node);
+                
+                if (node.level === "core") {
+                    this.clickedNodeId = node.id; // Track clicked node
+                    this.highlightConnections(node.id, true); // true = click highlight
+                } else if (node.level === "domain") {
+                    this.expandNode(node);
+                }
+            }
+            
+            highlightConnections(nodeId, isClick = false) {
+                this.clearHighlights();
+                
+                // If this is a click, update the clicked node tracking
+                if (isClick) {
+                    this.clickedNodeId = nodeId;
+                }
+                
+                // Highlight inner node
+                this.container.selectAll(".inner-node")
+                    .classed("highlighted", d => d.id === nodeId);
+                
+                // Highlight connections
+                this.container.selectAll(".connection-line")
+                    .classed("highlighted", function() {
+                        return d3.select(this).attr("data-inner") === nodeId;
+                    });
+                
+                // Highlight outer nodes
+                this.container.selectAll(".outer-node")
+                    .classed("highlighted", d => d.parent === nodeId);
+            }
+            
+            clearHighlights() {
+                this.container.selectAll(".highlighted").classed("highlighted", false);
+            }
+            
+            clearSelection() {
+                // Only clear info panel if no node is selected
+                if (!this.selectedNode) {
+                    this.updateInfoPanel(null);
+                }
+            }
+            
+            expandNode(node) {
+                this.selectedNode = node.id;
+                this.currentView = "expanded";
+                this.breadcrumbs = ["Values", node.name];
+                this.render();
+            }
+            
+            resetView() {
+                this.currentView = "main";
+                this.selectedNode = null;
+                this.clickedNodeId = null; // Clear clicked node tracking
+                this.breadcrumbs = ["Values"];
+                this.render();
+                this.updateInfoPanel(null);
+            }
+        }
+        
+        // Initialize visualization
+        document.addEventListener('DOMContentLoaded', () => {
+            new HierarchicalEdgeBundling();
+        });
+    </script>
+</body>
+</html>
