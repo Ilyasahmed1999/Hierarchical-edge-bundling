@@ -124,9 +124,9 @@
         /* Connection Styles */
         .connection-line {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.15);
+            stroke: rgba(255, 255, 255, 0.5);
             stroke-width: 1;
-            opacity: 0.6;
+            opacity: 1;
             transition: all 0.3s ease;
         }
 
@@ -195,7 +195,7 @@
         /* Circle Guides - matching the reference image */
         .circle-guide {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.1);
+            stroke: rgba(255, 255, 255, 0.4);
             stroke-width: 1;
         }
 
@@ -403,6 +403,29 @@
                 this.render();
             }
             
+            createCurvedPath(x1, y1, x2, y2) {
+                // Calculate control points for a smooth curve
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Create a curve that bends toward the center
+                const curvature = 0.1; // Adjust this value to control curve intensity
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                
+                // Calculate perpendicular offset for the curve
+                const offsetX = -dy * curvature;
+                const offsetY = dx * curvature;
+                
+                // Control point is offset from the midpoint
+                const controlX = midX + offsetX;
+                const controlY = midY + offsetY;
+                
+                // Create quadratic Bezier curve
+                return `M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`;
+            }
+            
             updateBreadcrumbs() {
                 const breadcrumbsDiv = d3.select("#breadcrumbs");
                 breadcrumbsDiv.selectAll("*").remove();
@@ -508,12 +531,11 @@
                 outerNodes.forEach(outer => {
                     const inner = innerNodes.find(n => n.id === outer.parent);
                     if (inner) {
-                        connectionsGroup.append("line")
+                        // Create curved path instead of straight line
+                        const path = this.createCurvedPath(inner.x, inner.y, outer.x, outer.y);
+                        connectionsGroup.append("path")
                             .attr("class", "connection-line")
-                            .attr("x1", inner.x)
-                            .attr("y1", inner.y)
-                            .attr("x2", outer.x)
-                            .attr("y2", outer.y)
+                            .attr("d", path)
                             .attr("data-inner", inner.id)
                             .attr("data-outer", outer.id);
                     }
@@ -669,10 +691,10 @@
                     const y = Math.sin(angle) * 250;
                     
                     // Connection line
-                    this.container.append("line")
+                    const path = this.createCurvedPath(0, 0, x, y);
+                    this.container.append("path")
                         .attr("class", "connection-line highlighted")
-                        .attr("x1", 0).attr("y1", 0)
-                        .attr("x2", x).attr("y2", y);
+                        .attr("d", path);
                     
                     // Node
                     this.container.append("circle")
